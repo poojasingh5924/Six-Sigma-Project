@@ -1,0 +1,1200 @@
+library(shiny)
+library(shinydashboard)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(DT)
+library(scales)
+library(plotly)
+
+# =======================
+# COLORBLIND-FRIENDLY PALETTE
+# =======================
+# Professional colorblind-safe palette
+color_primary <- "#0077BB"      # Blue
+color_secondary <- "#EE7733"    # Orange
+color_accent <- "#009988"       # Teal
+color_warning <- "#CC3311"      # Red
+color_neutral <- "#BBBBBB"      # Gray
+
+# =======================
+# DATA PREPARATION
+# =======================
+
+# Original FMEA Data (Table 3)
+fmea_data <- data.frame(
+  Component = c("Infusion Set/Tubing", "Infusion Set/Tubing", "Infusion Set/Tubing", "Infusion Set/Tubing",
+                "Battery", "Insulin Reservoir/Cartridge", "Pump motor", "Pump motor",
+                "Software/Feedback control algorithm", "Sensors (pressure, occlusion, flow, CGM)",
+                "User interface", "Circuit Board/Microcontroller"),
+  Failure_Mode = c("Occluded", "Air bubbles", "Adhesion failure", "Contamination",
+                   "Battery Failure", "Leakage/Occlusion", "Jam", "Wear down",
+                   "Software failure", "Sensor gives no reading/Incorrect reading",
+                   "Backlight/Button failure", "Short circuit"),
+  Severity = c(7, 6, 2, 6, 3, 5, 6, 3, 6, 4, 2, 2),
+  Occurrence = c(2, 4, 2, 2, 4, 3, 2, 1, 3, 7, 3, 1),
+  Detection = c(1, 1, 1, 3, 1, 2, 3, 2, 3, 1, 1, 2),
+  RPN = c(14, 24, 4, 36, 12, 30, 36, 6, 54, 28, 6, 4),
+  stringsAsFactors = FALSE
+)
+
+# Aggregate by component
+component_summary <- fmea_data %>%
+  group_by(Component) %>%
+  summarise(
+    Total_RPN = sum(RPN),
+    Max_Severity = max(Severity),
+    Max_Occurrence = max(Occurrence),
+    Max_Detection = max(Detection),
+    .groups = 'drop'
+  ) %>%
+  mutate(Component_Short = case_when(
+    Component == "Infusion Set/Tubing" ~ "Infusion Set",
+    Component == "Insulin Reservoir/Cartridge" ~ "Insulin Reservoir",
+    Component == "Pump motor" ~ "Pump Motor",
+    Component == "Software/Feedback control algorithm" ~ "Software",
+    Component == "Sensors (pressure, occlusion, flow, CGM)" ~ "Sensors",
+    Component == "User interface" ~ "User Interface",
+    Component == "Circuit Board/Microcontroller" ~ "Circuit Board",
+    TRUE ~ Component
+  ))
+
+# Post-production failure event costs
+event_costs <- data.frame(
+  Event_Type = c("Warranty, refund, replacement", "Field service, technical support", 
+                 "Recall", "Litigation, legal settlement", "Customer notification, communication",
+                 "Return processing, disposal, refurbishment", "Regulatory submission", "MDR, CAPA investigation"),
+  Probability = c(0.6, 0.8, 0.0001, 0.01, 0.3, 0.2, 0.01, 0.3),
+  Cost_per_Event = c(4000, 250, 15000000, 2500000, 100, 1500, 20000, 5000)
+)
+
+initial_failure_rate <- 0.21
+
+# =======================
+# OPTIMIZATION FUNCTION
+# =======================
+
+optimize_improvements <- function(target_failure_rate, component_data) {
+  
+  current_failure_rate <- initial_failure_rate
+  total_cost <- 0
+  improvements <- data.frame(
+    Component = character(),
+    Type = character(),
+    From = numeric(),
+    To = numeric(),
+    Cost = numeric(),
+    stringsAsFactors = FALSE
+  )
+  
+  # Calculate required reduction
+  required_reduction <- (initial_failure_rate - target_failure_rate) / initial_failure_rate
+  
+  if (required_reduction <= 0) {
+    new_rpn_data <- component_data %>%
+      mutate(New_RPN = Total_RPN, RPN_Reduction = 0)
+    
+    return(list(
+      improvements = improvements,
+      total_cost = 0,
+      new_failure_rate = initial_failure_rate,
+      new_rpn = new_rpn_data
+    ))
+  }
+  
+  # Calculate reduction needed based on target
+  reduction_factor <- target_failure_rate / initial_failure_rate
+  
+  new_rpn_data <- component_data
+  
+  for (i in 1:nrow(component_data)) {
+    comp <- component_data$Component_Short[i]
+    
+    # Calculate how much to reduce based on current values and target
+    severity_reduction <- max(0, floor((component_data$Max_Severity[i] - 2) * (1 - reduction_factor)))
+    occurrence_reduction <- max(0, floor((component_data$Max_Occurrence[i] - 1) * (1 - reduction_factor)))
+    detection_reduction <- max(0, floor((component_data$Max_Detection[i] - 1) * (1 - reduction_factor)))
+    
+    # Calculate costs based on reductions
+    if (severity_reduction > 0) {
+      cost <- 250000 * severity_reduction * (component_data$Max_Severity[i] / 5)
+      
+      improvements <- rbind(improvements, data.frame(
+        Component = comp,
+        Type = "Severity",
+        From = component_data$Max_Severity[i],
+        To = component_data$Max_Severity[i] - severity_reduction,
+        Cost = cost
+      ))
+      
+      new_rpn_data$Max_Severity[i] <- new_rpn_data$Max_Severity[i] - severity_reduction
+      total_cost <- total_cost + cost
+    }
+    
+    if (occurrence_reduction > 0) {
+      cost <- 180000 * occurrence_reduction * (component_data$Max_Occurrence[i] / 5)
+      
+      improvements <- rbind(improvements, data.frame(
+        Component = comp,
+        Type = "Occurrence",
+        From = component_data$Max_Occurrence[i],
+        To = component_data$Max_Occurrence[i] - occurrence_reduction,
+        Cost = cost
+      ))
+      
+      new_rpn_data$Max_Occurrence[i] <- new_rpn_data$Max_Occurrence[i] - occurrence_reduction
+      total_cost <- total_cost + cost
+    }
+    
+    if (detection_reduction > 0) {
+      cost <- 120000 * detection_reduction * (component_data$Max_Detection[i] / 5)
+      
+      improvements <- rbind(improvements, data.frame(
+        Component = comp,
+        Type = "Detection",
+        From = component_data$Max_Detection[i],
+        To = component_data$Max_Detection[i] - detection_reduction,
+        Cost = cost
+      ))
+      
+      new_rpn_data$Max_Detection[i] <- new_rpn_data$Max_Detection[i] - detection_reduction
+      total_cost <- total_cost + cost
+    }
+  }
+  
+  # Recalculate RPN and RPN reduction
+  new_rpn_data$New_RPN <- new_rpn_data$Max_Severity * new_rpn_data$Max_Occurrence * new_rpn_data$Max_Detection
+  new_rpn_data$RPN_Reduction <- new_rpn_data$Total_RPN - new_rpn_data$New_RPN
+  
+  return(list(
+    improvements = improvements,
+    total_cost = total_cost,
+    new_failure_rate = target_failure_rate,
+    new_rpn = new_rpn_data
+  ))
+}
+
+# =======================
+# UI
+# =======================
+
+ui <- dashboardPage(
+  skin = "blue",
+  dashboardHeader(title = "FMEA Six Sigma Analysis", titleWidth = 300),
+  
+  dashboardSidebar(
+    width = 280,
+    sidebarMenu(id = "tabs",
+                menuItem("Home", tabName = "home", icon = icon("home")),
+                menuItem("Introduction & Methods", tabName = "intro_methods", icon = icon("book")),
+                menuItem("Results & Analysis", tabName = "results", icon = icon("chart-bar")),
+                menuItem("Discussion", tabName = "discussion", icon = icon("comments"))
+    )
+  ),
+  
+  dashboardBody(
+    tags$head(
+      tags$style(HTML("
+        /* General styling */
+        .content-wrapper, .right-side {
+          background-color: #f8f9fa;
+        }
+        
+        .box {
+          border-top: 3px solid #0077BB;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        
+        /* Increased font sizes */
+        body, .box, p, li {
+          font-size: 14px !important;
+        }
+        
+        h2 {
+          font-size: 26px !important;
+          font-weight: 600;
+          color: #2c3e50;
+        }
+        
+        h3 {
+          font-size: 22px !important;
+          font-weight: 600;
+          color: #34495e;
+        }
+        
+        h4 {
+          font-size: 18px !important;
+          font-weight: 600;
+          color: #34495e;
+        }
+        
+        h5 {
+          font-size: 15px !important;
+          font-weight: 500;
+        }
+        
+        /* Header styling */
+        .header-box {
+          background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+          padding: 20px;
+          margin-bottom: 20px;
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          border-left: 5px solid #B31B1B;
+        }
+        
+        .logo-container {
+          width: 140px;
+          height: 100px;
+          border: 2px solid #0077BB;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background-color: #ffffff;
+          font-style: italic;
+          color: #666;
+          font-size: 13px;
+          text-align: center;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        /* Control panel */
+        .control-panel {
+          background: linear-gradient(135deg, #0077BB 0%, #005a8d 100%);
+          color: white;
+          padding: 15px;
+          border-radius: 8px;
+          margin-bottom: 20px;
+        }
+        
+        .control-panel h5 {
+          color: white !important;
+          margin-bottom: 5px;
+        }
+        
+        .control-panel h4 {
+          color: white !important;
+          font-weight: 700;
+        }
+        
+        /* Box heights */
+        .medium-height-box {
+          min-height: 400px;
+        }
+        
+        .full-height-box {
+          min-height: calc(100vh - 250px);
+        }
+        
+        .half-height-box {
+          min-height: calc(50vh - 150px);
+        }
+        
+        /* Placeholder styling */
+        .placeholder-box {
+          min-height: 300px;
+          background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+          border: 3px dashed #0077BB;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          padding: 20px;
+        }
+        
+        .placeholder-box h4 {
+          color: #0077BB !important;
+          font-weight: 600;
+        }
+        
+        /* Table styling */
+        .dataTable {
+          font-size: 13px !important;
+        }
+        
+        .dataTables_wrapper {
+          font-size: 13px !important;
+        }
+        
+        table.dataTable thead th {
+          font-size: 14px !important;
+          font-weight: 600;
+          background-color: #0077BB !important;
+          color: white !important;
+        }
+        
+        /* Figure captions */
+        .figure-caption {
+          font-size: 13px !important;
+          color: #555;
+          margin-top: 10px;
+          font-style: italic;
+        }
+        
+        /* Numeric input styling */
+        .form-control {
+          font-size: 16px !important;
+          font-weight: 600;
+          text-align: center;
+          border: 2px solid #0077BB;
+        }
+        
+        /* Interactive elements */
+        .info-box {
+          background-color: #E8F4F8;
+          border-left: 4px solid #0077BB;
+          padding: 15px;
+          margin: 10px 0;
+          border-radius: 4px;
+        }
+        
+        /* Button styling */
+        .btn-primary {
+          background-color: #0077BB !important;
+          border-color: #0077BB !important;
+          font-size: 14px !important;
+        }
+        
+        .btn-primary:hover {
+          background-color: #005a8d !important;
+          border-color: #005a8d !important;
+        }
+      "))
+    ),
+    
+    # Header Section
+    fluidRow(
+      column(12,
+             div(class = "header-box",
+                 fluidRow(
+                   column(2,
+                          div(class = "logo-container",
+                              tags$img(
+                                src = "https://i.imgur.com/7fom1qk.png",  # Just the filename, not the full path
+                                alt = "Cornell ",
+                                style = "width: 100%; height: auto; max-height: 80px; object-fit: contain;"
+                              )
+                          )
+                   ),
+                   column(8, align = "center",
+                          h2("Improving the Reliability of Insulin Pumps:", 
+                             style = "margin: 8px; font-weight: 700; color: #B31B1B;"),
+                          h3("A Six Sigma Approach", 
+                             style = "margin: 5px; font-weight: 600; color: #2c3e50;"),
+                          h4("Shreya Kumar | Pooja Singh | Sukrit Dass TM | Avdhesh Vermani", 
+                             style = "margin: 8px; color: #34495e;"),
+                          h5("Instructors: Dr. Timothy Fraser, Tolkien Bagchi", 
+                             style = "margin: 5px; color: #555;"),
+                          h5("Cornell University | SYSEN 5300 | Fall 2025", 
+                             style = "margin: 5px; color: #555;")
+                   ),
+                   column(2, align = "right",
+                          div(class = "logo-container",
+                              tags$div(
+                                tags$p("Team", style = "margin: 2px; font-weight: bold; font-size: 14px; color: #0077BB;"),
+                                tags$p("Logo", style = "margin: 2px; font-size: 11px; color: #666;")
+                              )
+                          )
+                   )
+                 )
+             )
+      )
+    ),
+    
+    # Control Panel
+    fluidRow(
+      column(12,
+             div(class = "control-panel",
+                 fluidRow(
+                   column(4, align = "center",
+                          h5("Initial Failure Rate", style = "margin-bottom: 5px;"),
+                          h3(textOutput("initial_fail_rate"), style = "color: #EE7733; margin: 5px; font-weight: 700;")
+                   ),
+                   column(4, align = "center",
+                          h5("Target Failure Rate", style = "margin-bottom: 5px;"),
+                          numericInput("target_fail_rate", 
+                                       label = NULL,
+                                       value = 0.1, 
+                                       min = 0.01, 
+                                       max = 0.20,
+                                       step = 0.01,
+                                       width = "60%")
+                   ),
+                   column(4, align = "center",
+                          h5("Total Investment Required", style = "margin-bottom: 5px;"),
+                          h3(textOutput("total_investment"), style = "color: #009988; margin: 5px; font-weight: 700;")
+                   )
+                 )
+             )
+      )
+    ),
+    
+    # Tab Content
+    tabItems(
+      # =======================
+      # HOME TAB
+      # =======================
+      tabItem(tabName = "home",
+              fluidRow(
+                # LEFT: Introduction & Process Map
+                column(4,
+                       box(title = "Introduction", width = 12, solidHeader = TRUE, status = "primary",
+                           h4("Project Overview", style = "margin-top: 5px; color: #0077BB;"),
+                           p(style = "font-size: 14px; line-height: 1.6;",
+                             "This Six Sigma project focuses on reducing failure rates in insulin pump devices through 
+                  systematic FMEA (Failure Mode and Effects Analysis) and cost-optimized design improvements."),
+                           
+                           div(class = "info-box",
+                               tags$b(style = "font-size: 15px;", "Key Objectives:"),
+                               tags$ul(style = "font-size: 14px; margin: 8px 0; line-height: 1.8;",
+                                       tags$li("Reduce device failure rate from 21% to target level"),
+                                       tags$li("Minimize investment through systematic optimization"),
+                                       tags$li("Prioritize critical safety components"),
+                                       tags$li("Achieve regulatory compliance standards")
+                               )
+                           )
+                       ),
+                       
+                       box(title = "Process Flow", width = 12, solidHeader = TRUE, status = "primary",
+                           div(class = "placeholder-box",
+                               tags$div(
+                                 icon("project-diagram", class = "fa-3x", style = "color: #0077BB; margin-bottom: 15px;"),
+                                 h4("Process Map", style = "margin: 10px 0;"),
+                                 p(style = "font-size: 13px; color: #666;", 
+                                   "FMEA Systematic Analysis Flow")
+                               )
+                           ),
+                           p(class = "figure-caption", style = "text-align: center;",
+                             "Figure 1: FMEA optimization methodology workflow")
+                       )
+                ),
+                
+                # MIDDLE: Methods & Impact Analysis
+                column(4,
+                       box(title = "Methodology", width = 12, solidHeader = TRUE, status = "info",
+                           class = "half-height-box",
+                           h4("Approach", style = "color: #0077BB;"),
+                           tags$ul(style = "font-size: 14px; line-height: 1.8;",
+                                   tags$li(tags$b("FMEA Analysis:"), " Systematic identification of failure modes"),
+                                   tags$li(tags$b("Risk Quantification:"), " RPN calculation (Severity * Occurrence * Detection)"),
+                                   tags$li(tags$b("Optimization:"), " Cost-benefit analysis for improvements"),
+                                   tags$li(tags$b("Validation:"), " Statistical confidence interval analysis")
+                           ),
+                           
+                           h4("Key Assumptions", style = "margin-top: 20px; color: #0077BB;"),
+                           tags$ul(style = "font-size: 13px; line-height: 1.6;",
+                                   tags$li("Production volume: 100,000 units"),
+                                   tags$li("Initial failure rate: 21%"),
+                                   tags$li("95% confidence intervals"),
+                                   tags$li("Independent failure modes")
+                           )
+                       ),
+                       
+                       box(title = "Impact Analysis", width = 12, solidHeader = TRUE, status = "info",
+                           class = "half-height-box",
+                           plotlyOutput("impact_analysis_plot", height = "300px"),
+                           p(class = "figure-caption", style = "text-align: center;",
+                             "Figure 2: Component Risk Priority Numbers (RPN) - Before vs After")
+                       )
+                ),
+                
+                # RIGHT: Recommendations, Discussion, Financial Summary
+                column(4,
+                       box(title = "Recommended Changes", width = 12, solidHeader = TRUE, status = "success",
+                           DT::dataTableOutput("recommendations_table_home"),
+                           p(class = "figure-caption", style = "text-align: center; margin-top: 10px;",
+                             "Table 1: Recommended component improvements")
+                       ),
+                       
+                       box(title = "Financial Summary", width = 12, solidHeader = TRUE, status = "warning",
+                           tableOutput("financial_table_home"),
+                           p(style = "font-size: 13px; margin-top: 10px; line-height: 1.6;",
+                             tags$b("Expected Cost per Failure: "),
+                             textOutput("cost_per_failure_home", inline = TRUE))
+                       ),
+                       
+                       box(title = "Key Insights", width = 12, solidHeader = TRUE, status = "warning",
+                           p(style = "font-size: 14px; line-height: 1.7;",
+                             "Strategic investments in high-RPN components yield substantial risk reduction. ",
+                             tags$b("Software reliability"), " and ", tags$b("sensor accuracy"), 
+                             " emerge as critical focus areas requiring immediate attention. ",
+                             "The analysis demonstrates positive ROI with significant reduction in post-production costs.")
+                       )
+                )
+              )
+      ),
+      
+      # =======================
+      # INTRODUCTION & METHODS TAB
+      # =======================
+      tabItem(tabName = "intro_methods",
+              fluidRow(
+                # LEFT: Introduction & Insulin Pump Image
+                column(4,
+                       box(title = "Introduction", width = 12, solidHeader = TRUE, status = "primary",
+                           class = "half-height-box",
+                           h4("Project Overview", style = "margin-top: 5px; color: #0077BB;"),
+                           p(style = "font-size: 14px; line-height: 1.6;",
+                             "Insulin pumps are critical medical devices for diabetes management. This project applies ",
+                             "Six Sigma methodologies to systematically reduce device failure rates and improve patient safety."),
+                           
+                           tags$b(style = "font-size: 15px;", "Problem Statement:"),
+                           p(style = "font-size: 14px; line-height: 1.6; margin-top: 8px;",
+                             "The current failure rate of 21% poses significant risks to patient safety and generates ",
+                             "substantial post-production costs through warranty claims, recalls, and litigation."),
+                           
+                           tags$b(style = "font-size: 15px;", "Objectives:"),
+                           tags$ul(style = "font-size: 14px; margin: 8px 0; line-height: 1.8;",
+                                   tags$li("Systematically identify and prioritize failure modes"),
+                                   tags$li("Optimize investment allocation for maximum risk reduction"),
+                                   tags$li("Achieve target failure rate with minimum cost"),
+                                   tags$li("Ensure regulatory compliance and patient safety")
+                           )
+                       ),
+                       
+                       box(title = "Insulin Pump Device", width = 12, solidHeader = TRUE, status = "primary",
+                           class = "half-height-box",
+                           div(class = "placeholder-box",
+                               tags$div(
+                                 icon("heartbeat", class = "fa-4x", style = "color: #EE7733; margin-bottom: 15px;"),
+                                 h4("3D Render", style = "margin: 10px 0;"),
+                                 p(style = "font-size: 13px; color: #666;", 
+                                   "Insulin Pump Assembly"),
+                                 tags$small(style = "color: #888;", "Image placeholder - to be added")
+                               )
+                           ),
+                           p(class = "figure-caption", style = "text-align: center;",
+                             "Figure 3: Insulin pump device with key components highlighted")
+                       )
+                ),
+                
+                # MIDDLE: Process Flow & Methodology
+                column(4,
+                       box(title = "Process Flow", width = 12, solidHeader = TRUE, status = "info",
+                           class = "half-height-box",
+                           div(class = "placeholder-box",
+                               tags$div(
+                                 icon("sitemap", class = "fa-3x", style = "color: #0077BB; margin-bottom: 15px;"),
+                                 h4("FMEA Process Flow", style = "margin: 10px 0;"),
+                                 tags$ol(style = "text-align: left; font-size: 13px; line-height: 1.8; color: #555;",
+                                         tags$li("Identify Components"),
+                                         tags$li("Define Failure Modes"),
+                                         tags$li("Assess S-O-D Ratings"),
+                                         tags$li("Calculate RPN"),
+                                         tags$li("Optimize Improvements"),
+                                         tags$li("Validate Results")
+                                 )
+                               )
+                           ),
+                           p(class = "figure-caption", style = "text-align: center;",
+                             "Figure 4: Six Sigma FMEA methodology workflow")
+                       ),
+                       
+                       box(title = "Methodology Details", width = 12, solidHeader = TRUE, status = "info",
+                           class = "half-height-box",
+                           h4("FMEA Approach", style = "color: #0077BB;"),
+                           tags$ul(style = "font-size: 14px; line-height: 1.8;",
+                                   tags$li(tags$b("Severity (S):"), " Impact of failure on patient/system (1-10)"),
+                                   tags$li(tags$b("Occurrence (O):"), " Frequency of failure mode (1-10)"),
+                                   tags$li(tags$b("Detection (D):"), " Ability to detect before failure (1-10)"),
+                                   tags$li(tags$b("RPN = S * O * D:"), " Risk Priority Number (1-1000)")
+                           ),
+                           
+                           h4("Optimization Model", style = "margin-top: 15px; color: #0077BB;"),
+                           p(style = "font-size: 13px; line-height: 1.6;",
+                             "Investment costs scale with improvement magnitude and baseline risk level. ",
+                             "The model minimizes total cost while achieving target failure rate reduction.")
+                       )
+                ),
+                
+                # RIGHT: FMEA Data Table (no scroll)
+                column(4,
+                       box(title = "FMEA Data", width = 12, solidHeader = TRUE, status = "success",
+                           style = "height: calc(100vh - 250px); overflow-y: auto;",
+                           h4("Component Failure Modes", style = "color: #0077BB; margin-bottom: 15px;"),
+                           DT::dataTableOutput("fmea_detailed_table_methods"),
+                           p(class = "figure-caption", style = "text-align: center; margin-top: 10px;",
+                             "Table 2: Complete FMEA with Severity (S), Occurrence (O), Detection (D), and RPN")
+                       )
+                )
+              )
+      ),
+      
+      # =======================
+      # RESULTS & ANALYSIS TAB
+      # =======================
+      tabItem(tabName = "results",
+              fluidRow(
+                # LEFT: CDF & Component Failure Rates
+                column(6,
+                       box(title = "Cumulative Distribution Function", width = 12, solidHeader = TRUE, status = "success",
+                           class = "half-height-box",
+                           plotOutput("cdf_time_plot_results", height = "400px"),
+                           p(class = "figure-caption", style = "text-align: center;",
+                             "Figure 5: CDF over 5-year period with 95% confidence intervals")
+                       ),
+                       
+                       box(title = "Component Failure Rates", width = 12, solidHeader = TRUE, status = "success",
+                           class = "half-height-box",
+                           plotOutput("component_failure_combined_results", height = "400px"),
+                           p(class = "figure-caption", style = "text-align: center;",
+                             "Figure 6: Component-level failure rates with 95% CI - before vs after")
+                       )
+                ),
+                
+                # RIGHT: Investment vs Impact & RPN Reduction
+                column(6,
+                       box(title = "Investment vs Impact Analysis", width = 12, solidHeader = TRUE, status = "success",
+                           class = "half-height-box",
+                           plotOutput("investment_impact_plot", height = "400px"),
+                           p(class = "figure-caption", style = "text-align: center;",
+                             "Figure 7: Return on investment - cost vs RPN reduction by component")
+                       ),
+                       
+                       box(title = "RPN Reduction by Component", width = 12, solidHeader = TRUE, status = "success",
+                           class = "half-height-box",
+                           plotOutput("rpn_reduction_plot_results", height = "400px"),
+                           p(class = "figure-caption", style = "text-align: center;",
+                             "Figure 8: Risk Priority Number changes after optimization")
+                       )
+                )
+              )
+      ),
+      
+      # =======================
+      # DISCUSSION TAB
+      # =======================
+      tabItem(tabName = "discussion",
+              fluidRow(
+                # LEFT: Recommended Changes Table
+                column(6,
+                       box(title = "Recommended Changes", width = 12, solidHeader = TRUE, status = "primary",
+                           class = "full-height-box",
+                           h4("Component-Level Improvements", style = "color: #0077BB; margin-bottom: 15px;"),
+                           DT::dataTableOutput("recommendations_table_discussion"),
+                           p(class = "figure-caption", style = "text-align: center; margin-top: 10px;",
+                             "Table 3: Detailed improvement recommendations with investment requirements"),
+                           
+                           tags$hr(),
+                           
+                           div(class = "info-box",
+                               h4("Implementation Priority", style = "color: #0077BB;"),
+                               tags$ol(style = "font-size: 14px; line-height: 1.8;",
+                                       tags$li(tags$b("High Priority:"), " Software & Sensors (highest RPN)"),
+                                       tags$li(tags$b("Medium Priority:"), " Pump Motor & Insulin Reservoir"),
+                                       tags$li(tags$b("Standard Priority:"), " Remaining components")
+                               )
+                           )
+                       )
+                ),
+                
+                # RIGHT: Financial Summary, Discussion, References
+                column(6,
+                       box(title = "Financial Summary", width = 12, solidHeader = TRUE, status = "warning",
+                           tableOutput("financial_table_discussion"),
+                           p(style = "font-size: 13px; margin-top: 10px; line-height: 1.6;",
+                             tags$b("Expected Cost per Failure: "),
+                             textOutput("cost_per_failure_discussion", inline = TRUE)),
+                           
+                           tags$hr(),
+                           
+                           h4("Cost-Benefit Analysis", style = "color: #0077BB;"),
+                           p(style = "font-size: 14px; line-height: 1.6;",
+                             "The analysis demonstrates strong financial viability. Annual savings from reduced failures ",
+                             "significantly offset the initial investment, with positive returns beginning within the first year of implementation.")
+                       ),
+                       
+                       box(title = "Discussion & Recommendations", width = 12, solidHeader = TRUE, status = "info",
+                           h4("Key Findings", style = "color: #0077BB;"),
+                           tags$ul(style = "font-size: 14px; line-height: 1.8;",
+                                   tags$li("Software and sensors represent highest initial risk"),
+                                   tags$li("Detection improvements offer best cost-effectiveness"),
+                                   tags$li("Systematic approach reduces overall failure rate by targeted amount"),
+                                   tags$li("Investment scales proportionally with risk reduction goals")
+                           ),
+                           
+                           h4("Recommendations", style = "margin-top: 15px; color: #0077BB;"),
+                           tags$ul(style = "font-size: 14px; line-height: 1.8;",
+                                   tags$li("Prioritize software V&V activities and testing"),
+                                   tags$li("Enhance sensor redundancy and diagnostics"),
+                                   tags$li("Implement proactive maintenance protocols"),
+                                   tags$li("Establish post-market surveillance program")
+                           ),
+                           
+                           h4("Future Work", style = "margin-top: 15px; color: #0077BB;"),
+                           tags$ul(style = "font-size: 14px; line-height: 1.8;",
+                                   tags$li("Conduct accelerated life testing validation"),
+                                   tags$li("Monitor field performance and update FMEA"),
+                                   tags$li("Explore ML-based detection algorithms"),
+                                   tags$li("Benchmark against industry standards")
+                           )
+                       ),
+                       
+                       box(title = "References", width = 12, solidHeader = TRUE, status = "primary",
+                           div(style = "text-align: center; padding: 20px;",
+                               div(class = "placeholder-box", style = "min-height: 150px; max-width: 200px; margin: 0 auto;",
+                                   tags$div(
+                                     icon("qrcode", class = "fa-4x", style = "color: #0077BB; margin-bottom: 10px;"),
+                                     h4("QR Code", style = "margin: 10px 0;"),
+                                     p(style = "font-size: 12px; color: #666;", "Scan for References")
+                                   )
+                               ),
+                               p(class = "figure-caption", style = "margin-top: 15px;",
+                                 "Access complete reference list and supplementary materials")
+                           )
+                       )
+                )
+              )
+      )
+    )
+  )
+)
+
+# =======================
+# SERVER
+# =======================
+
+server <- function(input, output, session) {
+  
+  output$initial_fail_rate <- renderText({
+    paste0(round(initial_failure_rate * 100, 1), "%")
+  })
+  
+  optimization_results <- reactive({
+    req(input$target_fail_rate)
+    optimize_improvements(input$target_fail_rate, component_summary)
+  })
+  
+  output$total_investment <- renderText({
+    results <- optimization_results()
+    dollar(results$total_cost)
+  })
+  
+  # Cost per failure
+  cost_per_failure_text <- reactive({
+    expected_cost_per_failure <- sum(event_costs$Probability * event_costs$Cost_per_Event)
+    dollar(expected_cost_per_failure)
+  })
+  
+  output$cost_per_failure_home <- renderText({ cost_per_failure_text() })
+  output$cost_per_failure_discussion <- renderText({ cost_per_failure_text() })
+  
+  # =======================
+  # PLOTS
+  # =======================
+  
+  # Impact Analysis Plot (Home)
+  output$impact_analysis_plot <- renderPlotly({
+    results <- optimization_results()
+    
+    rpn_comparison <- data.frame(
+      Component = rep(results$new_rpn$Component_Short, 2),
+      Category = rep(c("Before", "After"), each = nrow(results$new_rpn)),
+      RPN = c(results$new_rpn$Total_RPN, results$new_rpn$New_RPN)
+    )
+    
+    p <- ggplot(rpn_comparison, aes(x = reorder(Component, -RPN), y = RPN, fill = Category)) +
+      geom_col(position = "dodge", alpha = 0.85, width = 0.7) +
+      scale_fill_manual(values = c("Before" = color_secondary, "After" = color_accent)) +
+      labs(x = "", y = "Risk Priority Number (RPN)") +
+      theme_minimal(base_size = 13) +
+      theme(
+        legend.position = "top",
+        legend.title = element_blank(),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 13, face = "bold"),
+        panel.grid.major.x = element_blank()
+      ) +
+      coord_flip()
+    
+    ggplotly(p, tooltip = c("x", "y", "fill")) %>%
+      layout(legend = list(orientation = "h", x = 0.3, y = 1.1))
+  })
+  
+  # CDF Plot
+  output$cdf_time_plot_results <- renderPlot({
+    results <- optimization_results()
+    
+    time_seq <- seq(0, 5, length.out = 200)
+    lambda_before <- initial_failure_rate
+    lambda_after  <- results$new_failure_rate
+    
+    N <- 200
+    B <- 1000
+    
+    boot_cdfs_before <- matrix(0, nrow = B, ncol = length(time_seq))
+    boot_cdfs_after  <- matrix(0, nrow = B, ncol = length(time_seq))
+    
+    for (b in 1:B) {
+      simulated_before <- rexp(N, rate = lambda_before)
+      simulated_after  <- rexp(N, rate = lambda_after)
+      
+      lambda_before_hat <- 1 / mean(simulated_before)
+      lambda_after_hat  <- 1 / mean(simulated_after)
+      
+      boot_cdfs_before[b, ] <- 1 - exp(-lambda_before_hat * time_seq)
+      boot_cdfs_after[b, ]  <- 1 - exp(-lambda_after_hat  * time_seq)
+    }
+    
+    cdf_before <- 1 - exp(-lambda_before * time_seq)
+    cdf_after  <- 1 - exp(-lambda_after  * time_seq)
+    
+    ci_before_lower <- apply(boot_cdfs_before, 2, quantile, probs = 0.025)
+    ci_before_upper <- apply(boot_cdfs_before, 2, quantile, probs = 0.975)
+    
+    ci_after_lower  <- apply(boot_cdfs_after,  2, quantile, probs = 0.025)
+    ci_after_upper  <- apply(boot_cdfs_after,  2, quantile, probs = 0.975)
+    
+    # Prepare data for ribbons
+    ribbon_data <- data.frame(
+      Time = rep(time_seq, 2),
+      Lower = c(ci_before_lower, ci_after_lower),
+      Upper = c(ci_before_upper, ci_after_upper),
+      Scenario = rep(c("Before Investment", "After Investment"), each = length(time_seq))
+    )
+    
+    main_data <- data.frame(
+      Time = rep(time_seq, 2),
+      CDF = c(cdf_before, cdf_after),
+      Scenario = rep(c("Before Investment", "After Investment"), each = length(time_seq))
+    )
+    
+    ggplot() +
+      geom_ribbon(data = ribbon_data,
+                  aes(x = Time, ymin = Lower, ymax = Upper, fill = Scenario),
+                  alpha = 0.25) +
+      geom_line(data = main_data,
+                aes(x = Time, y = CDF, color = Scenario),
+                linewidth = 1.5) +
+      scale_color_manual(values = c("Before Investment" = color_secondary,
+                                    "After Investment" = color_accent)) +
+      scale_fill_manual(values = c("Before Investment" = color_secondary,
+                                   "After Investment" = color_accent)) +
+      labs(x = "Time (Years)", y = "Cumulative Probability of Failure") +
+      scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+      scale_x_continuous(breaks = 0:5) +
+      theme_minimal(base_size = 14) +
+      theme(
+        legend.position = "top",
+        legend.title = element_blank(),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 13, face = "bold")
+      )
+  })
+  
+  # Component Failure Rates
+  output$component_failure_combined_results <- renderPlot({
+    results <- optimization_results()
+    
+    component_before <- component_summary %>%
+      mutate(
+        Failure_Rate = (Total_RPN / sum(Total_RPN)) * initial_failure_rate,
+        SE = sqrt(Failure_Rate * (1 - Failure_Rate) / 100000),
+        Lower_CI = pmax(0, Failure_Rate - 1.96 * SE),
+        Upper_CI = Failure_Rate + 1.96 * SE,
+        Scenario = "Before Investment"
+      ) %>%
+      select(Component = Component_Short, Failure_Rate, Lower_CI, Upper_CI, Scenario)
+    
+    component_after <- results$new_rpn %>%
+      mutate(
+        Failure_Rate = (New_RPN / sum(New_RPN)) * results$new_failure_rate,
+        SE = sqrt(Failure_Rate * (1 - Failure_Rate) / 100000),
+        Lower_CI = pmax(0, Failure_Rate - 1.96 * SE),
+        Upper_CI = Failure_Rate + 1.96 * SE,
+        Scenario = "After Investment"
+      ) %>%
+      select(Component = Component_Short, Failure_Rate, Lower_CI, Upper_CI, Scenario)
+    
+    combined_data <- rbind(component_before, component_after)
+    
+    # Get ordering from "Before Investment" rates
+    component_order <- component_before %>%
+      arrange(desc(Failure_Rate)) %>%
+      pull(Component)
+    
+    combined_data$Component <- factor(combined_data$Component, levels = component_order)
+    
+    ggplot(combined_data, aes(x = Component, y = Failure_Rate, fill = Scenario)) +
+      geom_col(position = position_dodge(width = 0.8), alpha = 0.85, width = 0.7) +
+      geom_errorbar(aes(ymin = Lower_CI, ymax = Upper_CI), 
+                    position = position_dodge(width = 0.8), 
+                    width = 0.25, linewidth = 0.8, color = "black", alpha = 0.7) +
+      scale_fill_manual(values = c("Before Investment" = color_secondary, 
+                                   "After Investment" = color_accent)) +
+      coord_flip() +
+      scale_y_continuous(labels = percent_format(accuracy = 0.01)) +
+      labs(x = "", y = "Component Failure Rate") +
+      theme_minimal(base_size = 14) +
+      theme(
+        legend.position = "top",
+        legend.title = element_blank(),
+        axis.text = element_text(size = 12),
+        axis.text.y = element_text(size = 11),
+        axis.title = element_text(size = 13, face = "bold"),
+        panel.grid.major.y = element_blank()
+      )
+  })
+  
+  # Investment vs Impact Plot
+  output$investment_impact_plot <- renderPlot({
+    results <- optimization_results()
+    
+    if (nrow(results$improvements) == 0) {
+      plot.new()
+      text(0.5, 0.5, "No improvements needed", cex = 1.2)
+    } else {
+      investment_impact <- results$improvements %>%
+        group_by(Component) %>%
+        summarise(
+          Total_Investment = sum(Cost),
+          .groups = 'drop'
+        ) %>%
+        left_join(
+          results$new_rpn %>% select(Component_Short, RPN_Reduction),
+          by = c("Component" = "Component_Short")
+        )
+      
+      # Create short labels for better display
+      investment_impact <- investment_impact %>%
+        mutate(Short_Label = case_when(
+          grepl("Infusion", Component) ~ "Infusion Set",
+          grepl("Software", Component) ~ "Software",
+          grepl("Sensors", Component) ~ "Sensors",
+          grepl("Pump motor", Component) ~ "Pump Motor",
+          grepl("Insulin", Component) ~ "Insulin Reservoir",
+          grepl("Battery", Component) ~ "Battery",
+          grepl("User", Component) ~ "User Interface",
+          grepl("Circuit", Component) ~ "Circuit Board",
+          TRUE ~ Component
+        ))
+      
+      # Create the plot
+      ggplot(investment_impact, aes(x = RPN_Reduction, y = Total_Investment)) +
+        # Add confidence band for linear model
+        geom_smooth(method = "lm", se = TRUE, alpha = 0.15, 
+                    color = color_primary, fill = color_primary, linewidth = 1) +
+        # Add points
+        geom_point(aes(color = Short_Label), size = 6, alpha = 0.85) +
+        # Add text labels
+        geom_text(aes(label = Short_Label, color = Short_Label), 
+                  vjust = -1.2, size = 3.5, fontface = "bold", show.legend = FALSE) +
+        scale_y_continuous(labels = dollar_format(scale = 1e-3, suffix = "K"),
+                           limits = c(0, NA),
+                           expand = expansion(mult = c(0.05, 0.15))) +
+        scale_x_continuous(limits = c(0, NA),
+                           expand = expansion(mult = c(0.05, 0.15))) +
+        scale_color_manual(values = c(
+          "Infusion Set" = "#FF8C42",
+          "Software" = "#DC143C", 
+          "Sensors" = "#228B22",
+          "Pump Motor" = "#FF6B6B",
+          "Insulin Reservoir" = "#00CED1",
+          "Battery" = "#9370DB",
+          "User Interface" = "#FFD700",
+          "Circuit Board" = "#4169E1"
+        )) +
+        labs(
+          x = "RPN Reduction", 
+          y = "Investment Required ($)"
+        ) +
+        theme_minimal(base_size = 14) +
+        theme(
+          legend.position = "none",
+          axis.text = element_text(size = 12),
+          axis.title = element_text(size = 13, face = "bold"),
+          panel.grid.minor = element_blank(),
+          plot.margin = margin(10, 15, 10, 10)
+        )
+    }
+  })
+  
+  # RPN Reduction Plot
+  output$rpn_reduction_plot_results <- renderPlot({
+    results <- optimization_results()
+    
+    rpn_comparison <- data.frame(
+      Component = rep(results$new_rpn$Component_Short, 2),
+      Category = rep(c("Before", "After"), each = nrow(results$new_rpn)),
+      RPN = c(results$new_rpn$Total_RPN, results$new_rpn$New_RPN)
+    )
+    
+    ggplot(rpn_comparison, aes(x = reorder(Component, -RPN), y = RPN, fill = Category)) +
+      geom_col(position = "dodge", alpha = 0.85, width = 0.7) +
+      scale_fill_manual(values = c("Before" = color_secondary, "After" = color_accent)) +
+      coord_flip() +
+      labs(x = "", y = "Risk Priority Number (RPN)") +
+      theme_minimal(base_size = 14) +
+      theme(
+        legend.position = "top",
+        legend.title = element_blank(),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 13, face = "bold"),
+        panel.grid.major.y = element_blank()
+      )
+  })
+  
+  # Distribution Plot
+  output$distribution_plot <- renderPlot({
+    results <- optimization_results()
+    
+    # Use 0-15 years to show full distribution
+    x_seq <- seq(0, 15, length.out = 300)
+    
+    density_before <- dexp(x_seq, rate = initial_failure_rate)
+    density_after <- dexp(x_seq, rate = results$new_failure_rate)
+    
+    plot_data <- data.frame(
+      Time = rep(x_seq, 2),
+      Density = c(density_before, density_after),
+      Scenario = rep(c("Before Investment", "After Investment"), each = length(x_seq))
+    )
+    
+    ggplot(plot_data, aes(x = Time, y = Density, fill = Scenario)) +
+      geom_area(alpha = 0.6, position = "identity") +
+      scale_fill_manual(values = c("Before Investment" = color_secondary,
+                                   "After Investment" = color_accent)) +
+      labs(x = "Time (Years)", y = "Probability Density") +
+      scale_x_continuous(breaks = seq(0, 15, by = 3)) +
+      theme_minimal(base_size = 14) +
+      theme(
+        legend.position = "top",
+        legend.title = element_blank(),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 13, face = "bold")
+      )
+  })
+  
+  # =======================
+  # TABLES
+  # =======================
+  
+  # Financial Tables
+  render_financial_table <- function() {
+    results <- optimization_results()
+    
+    annual_failures_before <- 100000 * initial_failure_rate
+    annual_failures_after <- 100000 * results$new_failure_rate
+    expected_cost_per_failure <- sum(event_costs$Probability * event_costs$Cost_per_Event)
+    
+    cost_before <- annual_failures_before * expected_cost_per_failure
+    cost_after <- annual_failures_after * expected_cost_per_failure
+    annual_savings <- cost_before - cost_after
+    
+    data.frame(
+      Metric = c("Total Investment", "Annual Savings"),
+      Value = c(dollar(results$total_cost), dollar(annual_savings))
+    )
+  }
+  
+  output$financial_table_home <- renderTable({
+    render_financial_table()
+  }, striped = TRUE, hover = TRUE, bordered = TRUE, width = "100%", 
+  spacing = "m", align = "lc")
+  
+  output$financial_table_discussion <- renderTable({
+    render_financial_table()
+  }, striped = TRUE, hover = TRUE, bordered = TRUE, width = "100%",
+  spacing = "m", align = "lc")
+  
+  # Distribution Stats Table
+  output$distribution_stats <- renderTable({
+    results <- optimization_results()
+    
+    data.frame(
+      Metric = c("Mean Time to Failure (Before)", 
+                 "Mean Time to Failure (After)",
+                 "Improvement"),
+      Value = c(
+        sprintf("%.2f years", 1/initial_failure_rate),
+        sprintf("%.2f years", 1/results$new_failure_rate),
+        sprintf("%.1f%%", ((1/results$new_failure_rate) - (1/initial_failure_rate)) / (1/initial_failure_rate) * 100)
+      )
+    )
+  }, striped = TRUE, hover = TRUE, bordered = TRUE, width = "100%",
+  spacing = "s", align = "lc")
+  
+  # Recommendations Tables
+  output$recommendations_table_home <- DT::renderDataTable({
+    results <- optimization_results()
+    
+    if (nrow(results$improvements) == 0) {
+      data.frame(Message = "No improvements needed for target rate")
+    } else {
+      recommendations <- results$improvements %>%
+        mutate(
+          Change = paste0(Type, ": ", From, " -> ", To),
+          Investment = dollar(Cost)
+        ) %>%
+        select(Component, Change, Investment)
+      
+      DT::datatable(recommendations,
+                    options = list(
+                      pageLength = 8,
+                      dom = 't',
+                      ordering = FALSE,
+                      columnDefs = list(
+                        list(className = 'dt-left', targets = 0:1),
+                        list(className = 'dt-right', targets = 2)
+                      )
+                    ),
+                    rownames = FALSE,
+                    class = 'cell-border stripe compact',
+                    style = 'bootstrap')
+    }
+  })
+  
+  output$recommendations_table_discussion <- DT::renderDataTable({
+    results <- optimization_results()
+    
+    if (nrow(results$improvements) == 0) {
+      data.frame(Message = "No improvements needed for target rate")
+    } else {
+      recommendations <- results$improvements %>%
+        mutate(
+          Change = paste0(Type, ": ", From, " -> ", To),
+          Investment = dollar(Cost)
+        ) %>%
+        select(Component, Change, Investment)
+      
+      DT::datatable(recommendations,
+                    options = list(
+                      pageLength = 15,
+                      dom = 't',
+                      ordering = TRUE,
+                      columnDefs = list(
+                        list(className = 'dt-left', targets = 0:1),
+                        list(className = 'dt-right', targets = 2)
+                      )
+                    ),
+                    rownames = FALSE,
+                    class = 'cell-border stripe compact',
+                    style = 'bootstrap')
+    }
+  })
+  
+  # FMEA Detailed Table
+  output$fmea_detailed_table_methods <- DT::renderDataTable({
+    display_data <- fmea_data %>%
+      select(Component, `Failure Mode` = Failure_Mode, S = Severity, 
+             O = Occurrence, D = Detection, RPN)
+    
+    DT::datatable(display_data,
+                  options = list(
+                    pageLength = 20,
+                    dom = 't',
+                    ordering = TRUE,
+                    columnDefs = list(
+                      list(className = 'dt-center', targets = 2:5),
+                      list(className = 'dt-left', targets = 0:1)
+                    )
+                  ),
+                  rownames = FALSE,
+                  class = 'cell-border stripe compact',
+                  style = 'bootstrap')
+  })
+}
+
+shinyApp(ui = ui, server = server)
