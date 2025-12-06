@@ -180,7 +180,7 @@ optimize_improvements <- function(target_failure_rate, component_data) {
 
 ui <- dashboardPage(
   skin = "blue",
-  dashboardHeader(title = "FMEA Six Sigma Analysis", titleWidth = 300),
+  dashboardHeader(title = "Insulin Pump FMEA Analysis", titleWidth = 300),
   
   dashboardSidebar(
     width = 280,
@@ -361,6 +361,13 @@ ui <- dashboardPage(
           background-color: #005a8d !important;
           border-color: #005a8d !important;
         }
+        
+        /* CI text styling */
+        .ci-text {
+          font-size: 11px !important;
+          color: #666;
+          font-style: italic;
+        }
       "))
     ),
     
@@ -372,9 +379,9 @@ ui <- dashboardPage(
                    column(2,
                           div(class = "logo-container",
                               tags$img(
-                                src = "images/logo.png",  # Just the filename, not the full path
+                                src = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Cornell_University_seal.svg/200px-Cornell_University_seal.svg.png",  # Just the filename, not the full path
                                 alt = "Cornell ",
-                                style = "width: 100%; height: auto; max-height: 80px; object-fit: contain;"
+                                style = "height: 80px; width: auto; display: block; margin: auto;"
                               )
                           )
                    ),
@@ -392,9 +399,10 @@ ui <- dashboardPage(
                    ),
                    column(2, align = "right",
                           div(class = "logo-container",
-                              tags$div(
-                                tags$p("Team", style = "margin: 2px; font-weight: bold; font-size: 14px; color: #0077BB;"),
-                                tags$p("Logo", style = "margin: 2px; font-size: 11px; color: #666;")
+                              tags$img(
+                                src = "https://i.ibb.co/DHVMbtcH/Team-Logo.png",
+                                alt = "Team Logo",
+                                style = "height: 80px; width: auto; display: block; margin: auto;"
                               )
                           )
                    )
@@ -408,11 +416,11 @@ ui <- dashboardPage(
       column(12,
              div(class = "control-panel",
                  fluidRow(
-                   column(4, align = "center",
+                   column(3, align = "center",
                           h5("Initial Failure Rate", style = "margin-bottom: 5px;"),
                           h3(textOutput("initial_fail_rate"), style = "color: #EE7733; margin: 5px; font-weight: 700;")
                    ),
-                   column(4, align = "center",
+                   column(3, align = "center",
                           h5("Target Failure Rate", style = "margin-bottom: 5px;"),
                           numericInput("target_fail_rate", 
                                        label = NULL,
@@ -422,9 +430,13 @@ ui <- dashboardPage(
                                        step = 0.01,
                                        width = "60%")
                    ),
-                   column(4, align = "center",
+                   column(3, align = "center",
                           h5("Total Investment Required", style = "margin-bottom: 5px;"),
                           h3(textOutput("total_investment"), style = "color: #009988; margin: 5px; font-weight: 700;")
+                   ),
+                   column(3, align = "center",
+                          h5("Total Annual Savings", style = "margin-bottom: 5px;"),
+                          h3(textOutput("total_annual_savings"), style = "color: #FFD700; margin: 5px; font-weight: 700;")
                    )
                  )
              )
@@ -440,87 +452,74 @@ ui <- dashboardPage(
               fluidRow(
                 # LEFT: Introduction & Process Map
                 column(4,
-                       box(title = "Introduction", width = 12, solidHeader = TRUE, status = "primary",
-                           h4("Project Overview", style = "margin-top: 5px; color: #0077BB;"),
+                       box(title = "Introduction", width = 15, solidHeader = TRUE, status = "primary",
+                           h4("Project Background", style = "margin-top: 5px; color: #0077BB;"),
                            p(style = "font-size: 14px; line-height: 1.6;",
-                             "This Six Sigma project focuses on reducing failure rates in insulin pump devices through 
-                  systematic FMEA (Failure Mode and Effects Analysis) and cost-optimized design improvements."),
+                             "About 1 in 9 adults around the world have diabetes, and this proportion is expected to grow in the coming years. Insulin pumps have become central to modern diabetes management; however, frequent device malfunction lead to patient inconvenience and adverse events, like prolonged hyperglycemia and even death in extreme cases."),
+                           
                            
                            div(class = "info-box",
                                tags$b(style = "font-size: 15px;", "Key Objectives:"),
                                tags$ul(style = "font-size: 14px; margin: 8px 0; line-height: 1.8;",
-                                       tags$li("Reduce device failure rate from 21% to target level"),
-                                       tags$li("Minimize investment through systematic optimization"),
-                                       tags$li("Prioritize critical safety components"),
-                                       tags$li("Achieve regulatory compliance standards")
+                                       tags$li("Reduce current device failure rate to a target level"),
+                                       tags$li("Prioritize low-cost, high-impact improvements"),
+                                       tags$li("Generate recommendations for insulin pump manufacturers"),
+                                       tags$li("Maintain regulatory compliance")
                                )
                            )
                        ),
                        
-                       box(title = "Process Flow", width = 12, solidHeader = TRUE, status = "primary",
-                           div(class = "placeholder-box",
-                               tags$div(
-                                 icon("project-diagram", class = "fa-3x", style = "color: #0077BB; margin-bottom: 15px;"),
-                                 h4("Process Map", style = "margin: 10px 0;"),
-                                 p(style = "font-size: 13px; color: #666;", 
-                                   "FMEA Systematic Analysis Flow")
+                       box(title = "Methodology", width = 15, solidHeader = TRUE, status = "info",
+                           class = "half-height-box",
+                           div(style = "text-align: center; padding: 10px;",
+                               tags$img(
+                                 src = "https://i.ibb.co/4Z55whww/Methodology.png",
+                                 alt = "Methodology Details",
+                                 style = "max-width: 105%; height: auto; max-height: 250px; object-fit: contain; display: block; margin: 0 auto;"
                                )
                            ),
                            p(class = "figure-caption", style = "text-align: center;",
-                             "Figure 1: FMEA optimization methodology workflow")
-                       )
+                             "Figure 1: FMEA-driven Insulin Pump Improvement Analysis Workflow")
+                       ),
                 ),
                 
                 # MIDDLE: Methods & Impact Analysis
                 column(4,
-                       box(title = "Methodology", width = 12, solidHeader = TRUE, status = "info",
+                       box(title = "Cumulative Distribution Functions", width = 15, solidHeader = TRUE, status = "success",
                            class = "half-height-box",
-                           h4("Approach", style = "color: #0077BB;"),
-                           tags$ul(style = "font-size: 14px; line-height: 1.8;",
-                                   tags$li(tags$b("FMEA Analysis:"), " Systematic identification of failure modes"),
-                                   tags$li(tags$b("Risk Quantification:"), " RPN calculation (Severity * Occurrence * Detection)"),
-                                   tags$li(tags$b("Optimization:"), " Cost-benefit analysis for improvements"),
-                                   tags$li(tags$b("Validation:"), " Statistical confidence interval analysis")
-                           ),
-                           
-                           h4("Key Assumptions", style = "margin-top: 20px; color: #0077BB;"),
-                           tags$ul(style = "font-size: 13px; line-height: 1.6;",
-                                   tags$li("Production volume: 100,000 units"),
-                                   tags$li("Initial failure rate: 21%"),
-                                   tags$li("95% confidence intervals"),
-                                   tags$li("Independent failure modes")
-                           )
-                       ),
-                       
-                       box(title = "Impact Analysis", width = 12, solidHeader = TRUE, status = "info",
-                           class = "half-height-box",
-                           plotlyOutput("impact_analysis_plot", height = "300px"),
+                           plotOutput("cdf_time_plot_home", height = "250px"),
                            p(class = "figure-caption", style = "text-align: center;",
-                             "Figure 2: Component Risk Priority Numbers (RPN) - Before vs After")
-                       )
+                             "Figure 2: Failure Rate Cumulative Distribution Functions Before and After Device Improvements over 5-year period, with 95% confidence intervals (indicated by shaded regions)")
+                       ),
+                       box(title = "Impact vs Investment Analysis", width = 15, solidHeader = TRUE, status = "success",
+                           class = "half-height-box",
+                           plotOutput("investment_impact_plot_home", height = "360px"),
+                           p(class = "figure-caption", style = "text-align: center;",
+                             "Figure 3: Costs to achieve maximum possible RPN reductions by component")
+                       ),
                 ),
                 
                 # RIGHT: Recommendations, Discussion, Financial Summary
                 column(4,
-                       box(title = "Recommended Changes", width = 12, solidHeader = TRUE, status = "success",
+                       box(title = "Recommended Changes", width = 15, solidHeader = TRUE, status = "success",
                            DT::dataTableOutput("recommendations_table_home"),
                            p(class = "figure-caption", style = "text-align: center; margin-top: 10px;",
-                             "Table 1: Recommended component improvements")
+                             "Table 1: Recommended component improvements and their expected investments")
                        ),
                        
-                       box(title = "Financial Summary", width = 12, solidHeader = TRUE, status = "warning",
+                       box(title = "Financial Summary", width = 15, solidHeader = TRUE, status = "warning",
                            tableOutput("financial_table_home"),
                            p(style = "font-size: 13px; margin-top: 10px; line-height: 1.6;",
                              tags$b("Expected Cost per Failure: "),
                              textOutput("cost_per_failure_home", inline = TRUE))
                        ),
                        
-                       box(title = "Key Insights", width = 12, solidHeader = TRUE, status = "warning",
+                       box(title = "Key Insights", width = 15, solidHeader = TRUE, status = "warning",
                            p(style = "font-size: 14px; line-height: 1.7;",
-                             "Strategic investments in high-RPN components yield substantial risk reduction. ",
-                             tags$b("Software reliability"), " and ", tags$b("sensor accuracy"), 
-                             " emerge as critical focus areas requiring immediate attention. ",
-                             "The analysis demonstrates positive ROI with significant reduction in post-production costs.")
+                             "Strategic investments in high-RPN components yield substantial risk reduction. Mechanical components such as",
+                             tags$b("Infusion Sets"), " and ", tags$b("Insulin Reservoirs"), 
+                             " are as critical focus areas. ",
+                             "The analysis demonstrates positive ROI with significant reduction in post-production costs, with initial investments being only a fraction of the total yearly savings.")
                        )
                 )
               )
@@ -533,91 +532,88 @@ ui <- dashboardPage(
               fluidRow(
                 # LEFT: Introduction & Insulin Pump Image
                 column(4,
-                       box(title = "Introduction", width = 12, solidHeader = TRUE, status = "primary",
+                       box(title = "Introduction", width = 15, solidHeader = TRUE, status = "primary",
                            class = "half-height-box",
                            h4("Project Overview", style = "margin-top: 5px; color: #0077BB;"),
                            p(style = "font-size: 14px; line-height: 1.6;",
-                             "Insulin pumps are critical medical devices for diabetes management. This project applies ",
-                             "Six Sigma methodologies to systematically reduce device failure rates and improve patient safety."),
+                             "About 1 in 9 adults around the world have diabetes, and this proportion is expected to grow in the coming years. Insulin pumps have become central to modern diabetes management; however, frequent device malfunction lead to patient inconvenience and adverse events, like prolonged hyperglycemia and even death in extreme cases."),
                            
                            tags$b(style = "font-size: 15px;", "Problem Statement:"),
                            p(style = "font-size: 14px; line-height: 1.6; margin-top: 8px;",
-                             "The current failure rate of 21% poses significant risks to patient safety and generates ",
-                             "substantial post-production costs through warranty claims, recalls, and litigation."),
+                             "Insulin pump manufacturers need a list of recommended device design updates that prioritize the most impactful, cost-effective improvements to reduce the 4-year failure rate of insulin pumps from 21% to a target value. "),
                            
                            tags$b(style = "font-size: 15px;", "Objectives:"),
                            tags$ul(style = "font-size: 14px; margin: 8px 0; line-height: 1.8;",
-                                   tags$li("Systematically identify and prioritize failure modes"),
+                                   tags$li("Identify insulin pump failure modes and their Risk Priority Numbers (RPNs)"),
                                    tags$li("Optimize investment allocation for maximum risk reduction"),
-                                   tags$li("Achieve target failure rate with minimum cost"),
+                                   tags$li("Reduce current device failure rate to a target level with minimum cost"),
                                    tags$li("Ensure regulatory compliance and patient safety")
                            )
                        ),
                        
-                       box(title = "Insulin Pump Device", width = 12, solidHeader = TRUE, status = "primary",
+                       box(title = "Methodology", width = 15, solidHeader = TRUE, status = "info",
                            class = "half-height-box",
-                           div(class = "placeholder-box",
-                               tags$div(
-                                 icon("heartbeat", class = "fa-4x", style = "color: #EE7733; margin-bottom: 15px;"),
-                                 h4("3D Render", style = "margin: 10px 0;"),
-                                 p(style = "font-size: 13px; color: #666;", 
-                                   "Insulin Pump Assembly"),
-                                 tags$small(style = "color: #888;", "Image placeholder - to be added")
+                           div(style = "text-align: center; padding: 10px;",
+                               tags$img(
+                                 src = "https://i.ibb.co/4Z55whww/Methodology.png",
+                                 alt = "Methodology Details",
+                                 style = "max-width: 105%; height: auto; max-height: 250px; object-fit: contain; display: block; margin: 0 auto;"
                                )
                            ),
                            p(class = "figure-caption", style = "text-align: center;",
-                             "Figure 3: Insulin pump device with key components highlighted")
+                             "Figure 4: FMEA-driven Insulin Pump Improvement Analysis Workflow")
                        )
                 ),
                 
                 # MIDDLE: Process Flow & Methodology
                 column(4,
-                       box(title = "Process Flow", width = 12, solidHeader = TRUE, status = "info",
+                       box(title = "Insulin Pump Device", width = 15, solidHeader = TRUE, status = "primary",
                            class = "half-height-box",
-                           div(class = "placeholder-box",
-                               tags$div(
-                                 icon("sitemap", class = "fa-3x", style = "color: #0077BB; margin-bottom: 15px;"),
-                                 h4("FMEA Process Flow", style = "margin: 10px 0;"),
-                                 tags$ol(style = "text-align: left; font-size: 13px; line-height: 1.8; color: #555;",
-                                         tags$li("Identify Components"),
-                                         tags$li("Define Failure Modes"),
-                                         tags$li("Assess S-O-D Ratings"),
-                                         tags$li("Calculate RPN"),
-                                         tags$li("Optimize Improvements"),
-                                         tags$li("Validate Results")
-                                 )
+                           div(style = "text-align: center; padding: 10px;",
+                               tags$img(
+                                 src = "https://i.ibb.co/Y7yvM0Vb/Gemini-Generated-Image-62rvkp62rvkp62rv.png",
+                                 alt = "Insulin Pump Assembly",
+                                 style = "max-width: 105%; height: auto; max-height: 350px; object-fit: contain; display: block; margin: 0 auto;"
                                )
                            ),
                            p(class = "figure-caption", style = "text-align: center;",
-                             "Figure 4: Six Sigma FMEA methodology workflow")
+                             "Figure 5: A graphic of an insulin pump device with key components identified.")
                        ),
-                       
-                       box(title = "Methodology Details", width = 12, solidHeader = TRUE, status = "info",
+                       box(title = "Process Flow", width = 15, solidHeader = TRUE, status = "info",
                            class = "half-height-box",
-                           h4("FMEA Approach", style = "color: #0077BB;"),
-                           tags$ul(style = "font-size: 14px; line-height: 1.8;",
-                                   tags$li(tags$b("Severity (S):"), " Impact of failure on patient/system (1-10)"),
-                                   tags$li(tags$b("Occurrence (O):"), " Frequency of failure mode (1-10)"),
-                                   tags$li(tags$b("Detection (D):"), " Ability to detect before failure (1-10)"),
-                                   tags$li(tags$b("RPN = S * O * D:"), " Risk Priority Number (1-1000)")
+                           div(style = "text-align: center; padding: 10px;",
+                               tags$img(
+                                 src = "https://i.ibb.co/TBRNYYHf/Process-Map.jpg",
+                                 alt = "FMEA Process Flow",
+                                 style = "max-width: 200%; height: auto; max-height: 500px; object-fit: contain; display: block; margin: 0 auto;"
+                               )
                            ),
-                           
-                           h4("Optimization Model", style = "margin-top: 15px; color: #0077BB;"),
-                           p(style = "font-size: 13px; line-height: 1.6;",
-                             "Investment costs scale with improvement magnitude and baseline risk level. ",
-                             "The model minimizes total cost while achieving target failure rate reduction.")
+                           p(class = "figure-caption", style = "text-align: center;",
+                             "Figure 6: Process map of insulin pump function")
                        )
+                       
+                       
                 ),
                 
                 # RIGHT: FMEA Data Table (no scroll)
                 column(4,
-                       box(title = "FMEA Data", width = 12, solidHeader = TRUE, status = "success",
-                           style = "height: calc(100vh - 250px); overflow-y: auto;",
+                       box(title = "Assumptions", width = 15, solidHeader = TRUE, status = "success",
+                           class = "half-height-box",
+                           tags$ul(style = "font-size: 14px; margin: 8px 0; line-height: 1.8;",
+                                   tags$li("Current 4-Year failure rate is 21%, according to insulin pump failure data from the FDA MAUDE database"),
+                                   tags$li("100,000 insulin pumps are sold every year"),
+                                   tags$li("Only failure modes are considered which directly impair the pump's ability to deliver insulin"),
+                                   tags$li("The cost for each improvement depends on part complexity, S/O/D risk type, and initial S/O/D score"),
+                                   tags$li("Device improvements should be prioritized by having higher RPN reduction per cost")
+                           )
+                       ),
+                       box(title = "FMEA Data", width = 15, solidHeader = TRUE, status = "success",
                            h4("Component Failure Modes", style = "color: #0077BB; margin-bottom: 15px;"),
                            DT::dataTableOutput("fmea_detailed_table_methods"),
                            p(class = "figure-caption", style = "text-align: center; margin-top: 10px;",
                              "Table 2: Complete FMEA with Severity (S), Occurrence (O), Detection (D), and RPN")
                        )
+                       
                 )
               )
       ),
@@ -629,35 +625,35 @@ ui <- dashboardPage(
               fluidRow(
                 # LEFT: CDF & Component Failure Rates
                 column(6,
-                       box(title = "Cumulative Distribution Function", width = 12, solidHeader = TRUE, status = "success",
+                       box(title = "Cumulative Distribution Functions", width = 15, solidHeader = TRUE, status = "success",
                            class = "half-height-box",
                            plotOutput("cdf_time_plot_results", height = "400px"),
                            p(class = "figure-caption", style = "text-align: center;",
-                             "Figure 5: CDF over 5-year period with 95% confidence intervals")
+                             "Figure 7: Failure Rate Cumulative Distribution Functions Before and After Device Improvements over 5-year period, with 95% confidence intervals (indicated by shaded regions)")
                        ),
                        
-                       box(title = "Component Failure Rates", width = 12, solidHeader = TRUE, status = "success",
+                       box(title = "Component Failure Rates", width = 15, solidHeader = TRUE, status = "success",
                            class = "half-height-box",
                            plotOutput("component_failure_combined_results", height = "400px"),
                            p(class = "figure-caption", style = "text-align: center;",
-                             "Figure 6: Component-level failure rates with 95% CI - before vs after")
+                             "Figure 9: Component-level failure rates before and after investment, with 95% confidence intervals")
                        )
                 ),
                 
                 # RIGHT: Investment vs Impact & RPN Reduction
                 column(6,
-                       box(title = "Investment vs Impact Analysis", width = 12, solidHeader = TRUE, status = "success",
+                       box(title = "Investment vs Impact Analysis", width = 15, solidHeader = TRUE, status = "success",
                            class = "half-height-box",
                            plotOutput("investment_impact_plot", height = "400px"),
                            p(class = "figure-caption", style = "text-align: center;",
-                             "Figure 7: Return on investment - cost vs RPN reduction by component")
+                             "Figure 8: Costs to achieve maximum possible RPN reductions by component")
                        ),
                        
-                       box(title = "RPN Reduction by Component", width = 12, solidHeader = TRUE, status = "success",
+                       box(title = "RPN Reduction by Component", width = 15, solidHeader = TRUE, status = "success",
                            class = "half-height-box",
                            plotOutput("rpn_reduction_plot_results", height = "400px"),
                            p(class = "figure-caption", style = "text-align: center;",
-                             "Figure 8: Risk Priority Number changes after optimization")
+                             "Figure 10: Risk Priority Numbers (RPNs) before and after optimization by component")
                        )
                 )
               )
@@ -670,8 +666,7 @@ ui <- dashboardPage(
               fluidRow(
                 # LEFT: Recommended Changes Table
                 column(6,
-                       box(title = "Recommended Changes", width = 12, solidHeader = TRUE, status = "primary",
-                           class = "full-height-box",
+                       box(title = "Recommended Changes", width = 15, solidHeader = TRUE, status = "primary",
                            h4("Component-Level Improvements", style = "color: #0077BB; margin-bottom: 15px;"),
                            DT::dataTableOutput("recommendations_table_discussion"),
                            p(class = "figure-caption", style = "text-align: center; margin-top: 10px;",
@@ -682,17 +677,29 @@ ui <- dashboardPage(
                            div(class = "info-box",
                                h4("Implementation Priority", style = "color: #0077BB;"),
                                tags$ol(style = "font-size: 14px; line-height: 1.8;",
-                                       tags$li(tags$b("High Priority:"), " Software & Sensors (highest RPN)"),
-                                       tags$li(tags$b("Medium Priority:"), " Pump Motor & Insulin Reservoir"),
+                                       tags$li(tags$b("High Priority:"), " Infusion Set and Insulin Reservoir"),
+                                       tags$li(tags$b("Medium Priority:"), " Pump Motor & Sensors/Software"),
                                        tags$li(tags$b("Standard Priority:"), " Remaining components")
                                )
                            )
+                       ),
+                       
+                       box(width = 15, status = "info",
+                           div(style = "text-align: center; padding: 10px;",
+                               tags$img(
+                                 src = "https://i.ibb.co/N6LJC6QL/Corgi.jpg",
+                                 alt = "Methodology Details",
+                                 style = "max-width: 105%; height: auto; max-height: 250px; object-fit: contain; display: block; margin: 0 auto;"
+                               )
+                           ),
+                           p(style = "text-align: center; margin-top: 10px; font-size: 150%;",
+                             "Corgi approves this analysis!"),
                        )
                 ),
                 
                 # RIGHT: Financial Summary, Discussion, References
                 column(6,
-                       box(title = "Financial Summary", width = 12, solidHeader = TRUE, status = "warning",
+                       box(title = "Financial Summary", width = 15, solidHeader = TRUE, status = "warning",
                            tableOutput("financial_table_discussion"),
                            p(style = "font-size: 13px; margin-top: 10px; line-height: 1.6;",
                              tags$b("Expected Cost per Failure: "),
@@ -706,19 +713,20 @@ ui <- dashboardPage(
                              "significantly offset the initial investment, with positive returns beginning within the first year of implementation.")
                        ),
                        
-                       box(title = "Discussion & Recommendations", width = 12, solidHeader = TRUE, status = "info",
+                       box(title = "Discussion & Recommendations", width = 15, solidHeader = TRUE, status = "info",
                            h4("Key Findings", style = "color: #0077BB;"),
                            tags$ul(style = "font-size: 14px; line-height: 1.8;",
-                                   tags$li("Software and sensors represent highest initial risk"),
-                                   tags$li("Detection improvements offer best cost-effectiveness"),
-                                   tags$li("Systematic approach reduces overall failure rate by targeted amount"),
+                                   tags$li("Batteries, Infusion Sets, and Insulin Reservoirs pose the greatest potential for cost-effective improvement"),
+                                   tags$li("Systematic approach effectively provides recommendations for failure rate reduction to target level"),
                                    tags$li("Investment scales proportionally with risk reduction goals")
                            ),
                            
                            h4("Recommendations", style = "margin-top: 15px; color: #0077BB;"),
                            tags$ul(style = "font-size: 14px; line-height: 1.8;",
-                                   tags$li("Prioritize software V&V activities and testing"),
+                                   tags$li("Prioritize mechanical design updates and testing"),
+                                   tags$li("Improve detection of complications in insulin delivery at any component that contacts insulin"),
                                    tags$li("Enhance sensor redundancy and diagnostics"),
+                                   tags$li("Implement software V&V activities and testing"),
                                    tags$li("Implement proactive maintenance protocols"),
                                    tags$li("Establish post-market surveillance program")
                            ),
@@ -727,22 +735,18 @@ ui <- dashboardPage(
                            tags$ul(style = "font-size: 14px; line-height: 1.8;",
                                    tags$li("Conduct accelerated life testing validation"),
                                    tags$li("Monitor field performance and update FMEA"),
-                                   tags$li("Explore ML-based detection algorithms"),
+                                   tags$li("Develop tools to provide real-time recommendations to insulin pump manufacturers"),
                                    tags$li("Benchmark against industry standards")
                            )
                        ),
                        
-                       box(title = "References", width = 12, solidHeader = TRUE, status = "primary",
+                       box(title = "References", width = 15, solidHeader = TRUE, status = "primary",
                            div(style = "text-align: center; padding: 20px;",
-                               div(class = "placeholder-box", style = "min-height: 150px; max-width: 200px; margin: 0 auto;",
-                                   tags$div(
-                                     icon("qrcode", class = "fa-4x", style = "color: #0077BB; margin-bottom: 10px;"),
-                                     h4("QR Code", style = "margin: 10px 0;"),
-                                     p(style = "font-size: 12px; color: #666;", "Scan for References")
-                                   )
-                               ),
-                               p(class = "figure-caption", style = "margin-top: 15px;",
-                                 "Access complete reference list and supplementary materials")
+                               tags$img(
+                                 src = "https://i.ibb.co/fTFVxg7/Reference.png",
+                                 alt = "Methodology Details",
+                                 style = "max-width: 105%; height: auto; max-height: 250px; object-fit: contain; display: block; margin: 0 auto;"
+                               )
                            )
                        )
                 )
@@ -772,6 +776,20 @@ server <- function(input, output, session) {
     dollar(results$total_cost)
   })
   
+  output$total_annual_savings <- renderText({
+    results <- optimization_results()
+    
+    annual_failures_before <- 100000 * initial_failure_rate
+    annual_failures_after <- 100000 * results$new_failure_rate
+    expected_cost_per_failure <- sum(event_costs$Probability * event_costs$Cost_per_Event)
+    
+    cost_before <- annual_failures_before * expected_cost_per_failure
+    cost_after <- annual_failures_after * expected_cost_per_failure
+    annual_savings <- cost_before - cost_after
+    
+    dollar(annual_savings)
+  })
+  
   # Cost per failure
   cost_per_failure_text <- reactive({
     expected_cost_per_failure <- sum(event_costs$Probability * event_costs$Cost_per_Event)
@@ -785,32 +803,147 @@ server <- function(input, output, session) {
   # PLOTS
   # =======================
   
-  # Impact Analysis Plot (Home)
-  output$impact_analysis_plot <- renderPlotly({
+  # CDF Plot (Home)
+  output$cdf_time_plot_home <- renderPlot({
     results <- optimization_results()
     
-    rpn_comparison <- data.frame(
-      Component = rep(results$new_rpn$Component_Short, 2),
-      Category = rep(c("Before", "After"), each = nrow(results$new_rpn)),
-      RPN = c(results$new_rpn$Total_RPN, results$new_rpn$New_RPN)
+    time_seq <- seq(0, 5, length.out = 200)
+    lambda_before <- initial_failure_rate
+    lambda_after  <- results$new_failure_rate
+    
+    N <- 200
+    B <- 1000
+    
+    boot_cdfs_before <- matrix(0, nrow = B, ncol = length(time_seq))
+    boot_cdfs_after  <- matrix(0, nrow = B, ncol = length(time_seq))
+    
+    for (b in 1:B) {
+      simulated_before <- rexp(N, rate = lambda_before)
+      simulated_after  <- rexp(N, rate = lambda_after)
+      
+      lambda_before_hat <- 1 / mean(simulated_before)
+      lambda_after_hat  <- 1 / mean(simulated_after)
+      
+      boot_cdfs_before[b, ] <- 1 - exp(-lambda_before_hat * time_seq)
+      boot_cdfs_after[b, ]  <- 1 - exp(-lambda_after_hat  * time_seq)
+    }
+    
+    cdf_before <- 1 - exp(-lambda_before * time_seq)
+    cdf_after  <- 1 - exp(-lambda_after  * time_seq)
+    
+    ci_before_lower <- apply(boot_cdfs_before, 2, quantile, probs = 0.025)
+    ci_before_upper <- apply(boot_cdfs_before, 2, quantile, probs = 0.975)
+    
+    ci_after_lower  <- apply(boot_cdfs_after,  2, quantile, probs = 0.025)
+    ci_after_upper  <- apply(boot_cdfs_after,  2, quantile, probs = 0.975)
+    
+    ribbon_data <- data.frame(
+      Time = rep(time_seq, 2),
+      Lower = c(ci_before_lower, ci_after_lower),
+      Upper = c(ci_before_upper, ci_after_upper),
+      Scenario = rep(c("Before Investment", "After Investment"), each = length(time_seq))
     )
     
-    p <- ggplot(rpn_comparison, aes(x = reorder(Component, -RPN), y = RPN, fill = Category)) +
-      geom_col(position = "dodge", alpha = 0.85, width = 0.7) +
-      scale_fill_manual(values = c("Before" = color_secondary, "After" = color_accent)) +
-      labs(x = "", y = "Risk Priority Number (RPN)") +
-      theme_minimal(base_size = 13) +
+    main_data <- data.frame(
+      Time = rep(time_seq, 2),
+      CDF = c(cdf_before, cdf_after),
+      Scenario = rep(c("Before Investment", "After Investment"), each = length(time_seq))
+    )
+    
+    ggplot() +
+      geom_ribbon(data = ribbon_data,
+                  aes(x = Time, ymin = Lower, ymax = Upper, fill = Scenario),
+                  alpha = 0.25) +
+      geom_line(data = main_data,
+                aes(x = Time, y = CDF, color = Scenario),
+                linewidth = 1.5) +
+      scale_color_manual(values = c("Before Investment" = color_secondary,
+                                    "After Investment" = color_accent)) +
+      scale_fill_manual(values = c("Before Investment" = color_secondary,
+                                   "After Investment" = color_accent)) +
+      labs(x = "Time (Years)", y = "Cumulative Probability of Failure") +
+      scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+      scale_x_continuous(breaks = 0:5) +
+      theme_minimal(base_size = 14) +
       theme(
         legend.position = "top",
         legend.title = element_blank(),
         axis.text = element_text(size = 12),
-        axis.title = element_text(size = 13, face = "bold"),
-        panel.grid.major.x = element_blank()
-      ) +
-      coord_flip()
+        axis.title = element_text(size = 13, face = "bold")
+      )
+  })
+  
+  
+  output$investment_impact_plot_home <- renderPlot({
+    results <- optimization_results()
     
-    ggplotly(p, tooltip = c("x", "y", "fill")) %>%
-      layout(legend = list(orientation = "h", x = 0.3, y = 1.1))
+    if (nrow(results$improvements) == 0) {
+      plot.new()
+      text(0.5, 0.5, "No improvements needed", cex = 1.2)
+    } else {
+      investment_impact <- results$improvements %>%
+        group_by(Component) %>%
+        summarise(
+          Total_Investment = sum(Cost),
+          .groups = 'drop'
+        ) %>%
+        left_join(
+          results$new_rpn %>% select(Component_Short, RPN_Reduction),
+          by = c("Component" = "Component_Short")
+        )
+      
+      # Create short labels for better display
+      investment_impact <- investment_impact %>%
+        mutate(Short_Label = case_when(
+          grepl("Infusion", Component) ~ "Infusion Set",
+          grepl("Software", Component) ~ "Software",
+          grepl("Sensors", Component) ~ "Sensors",
+          grepl("Pump motor", Component) ~ "Pump Motor",
+          grepl("Insulin", Component) ~ "Insulin Reservoir",
+          grepl("Battery", Component) ~ "Battery",
+          grepl("User", Component) ~ "User Interface",
+          grepl("Circuit", Component) ~ "Circuit Board",
+          TRUE ~ Component
+        ))
+      
+      # Create the plot
+      ggplot(investment_impact, aes(x = RPN_Reduction, y = Total_Investment)) +
+        # Add confidence band for linear model
+        geom_smooth(method = "lm", se = TRUE, alpha = 0.15, 
+                    color = color_primary, fill = color_primary, linewidth = 1) +
+        # Add points
+        geom_point(aes(color = Short_Label), size = 6, alpha = 0.85) +
+        # Add text labels
+        geom_text(aes(label = Short_Label, color = Short_Label), 
+                  vjust = -1.2, size = 3.5, fontface = "bold", show.legend = FALSE) +
+        scale_y_continuous(labels = dollar_format(scale = 1e-3, suffix = "K"),
+                           limits = c(0, NA),
+                           expand = expansion(mult = c(0.05, 0.15))) +
+        scale_x_continuous(limits = c(0, NA),
+                           expand = expansion(mult = c(0.05, 0.15))) +
+        scale_color_manual(values = c(
+          "Infusion Set" = "#FF8C42",
+          "Software" = "#DC143C", 
+          "Sensors" = "#228B22",
+          "Pump Motor" = "#FF6B6B",
+          "Insulin Reservoir" = "#00CED1",
+          "Battery" = "#9370DB",
+          "User Interface" = "#FFD700",
+          "Circuit Board" = "#4169E1"
+        )) +
+        labs(
+          x = "RPN Reduction", 
+          y = "Investment Required ($)"
+        ) +
+        theme_minimal(base_size = 14) +
+        theme(
+          legend.position = "none",
+          axis.text = element_text(size = 12),
+          axis.title = element_text(size = 13, face = "bold"),
+          panel.grid.minor = element_blank(),
+          plot.margin = margin(10, 15, 10, 10)
+        )
+    }
   })
   
   # CDF Plot
@@ -1071,21 +1204,66 @@ server <- function(input, output, session) {
   # TABLES
   # =======================
   
-  # Financial Tables
+  # Financial Tables with Confidence Intervals
   render_financial_table <- function() {
     results <- optimization_results()
     
-    annual_failures_before <- 100000 * initial_failure_rate
-    annual_failures_after <- 100000 * results$new_failure_rate
+    # Bootstrap simulation for confidence intervals
+    B <- 1000  # Number of bootstrap iterations
+    n_devices <- 100000
+    
+    # Storage for bootstrap results
+    boot_savings <- numeric(B)
+    
+    for (b in 1:B) {
+      # Simulate failure rates with uncertainty
+      # Using beta distribution for failure rate uncertainty
+      # Shape parameters based on observed failures
+      alpha_before <- initial_failure_rate * n_devices + 1
+      beta_before <- (1 - initial_failure_rate) * n_devices + 1
+      sim_rate_before <- rbeta(1, alpha_before, beta_before)
+      
+      alpha_after <- results$new_failure_rate * n_devices + 1
+      beta_after <- (1 - results$new_failure_rate) * n_devices + 1
+      sim_rate_after <- rbeta(1, alpha_after, beta_after)
+      
+      # Simulate cost per failure with uncertainty (±15% variation)
+      expected_cost_per_failure <- sum(event_costs$Probability * event_costs$Cost_per_Event)
+      sim_cost_per_failure <- rnorm(1, expected_cost_per_failure, expected_cost_per_failure * 0.15)
+      
+      # Calculate failures and costs
+      sim_failures_before <- n_devices * sim_rate_before
+      sim_failures_after <- n_devices * sim_rate_after
+      
+      sim_cost_before <- sim_failures_before * sim_cost_per_failure
+      sim_cost_after <- sim_failures_after * sim_cost_per_failure
+      
+      boot_savings[b] <- sim_cost_before - sim_cost_after
+    }
+    
+    # Point estimates
+    annual_failures_before <- n_devices * initial_failure_rate
+    annual_failures_after <- n_devices * results$new_failure_rate
     expected_cost_per_failure <- sum(event_costs$Probability * event_costs$Cost_per_Event)
     
     cost_before <- annual_failures_before * expected_cost_per_failure
     cost_after <- annual_failures_after * expected_cost_per_failure
     annual_savings <- cost_before - cost_after
     
+    # Calculate confidence intervals
+    savings_ci_lower <- quantile(boot_savings, 0.025)
+    savings_ci_upper <- quantile(boot_savings, 0.975)
+    
+    # Investment has no uncertainty (it's a fixed cost decision)
+    investment_value <- paste0(dollar(results$total_cost), "\n(Fixed Cost)")
+    savings_value <- paste0(
+      dollar(annual_savings), "\n",
+      "(95% CI: ", dollar(savings_ci_lower), " - ", dollar(savings_ci_upper), ")"
+    )
+    
     data.frame(
       Metric = c("Total Investment", "Annual Savings"),
-      Value = c(dollar(results$total_cost), dollar(annual_savings))
+      Value = c(investment_value, savings_value)
     )
   }
   
@@ -1183,9 +1361,12 @@ server <- function(input, output, session) {
     
     DT::datatable(display_data,
                   options = list(
-                    pageLength = 20,
-                    dom = 't',
+                    pageLength = 12,
+                    dom = 'tp',
                     ordering = TRUE,
+                    scrollY = "450px",
+                    scrollCollapse = TRUE,
+                    paging = FALSE,
                     columnDefs = list(
                       list(className = 'dt-center', targets = 2:5),
                       list(className = 'dt-left', targets = 0:1)
